@@ -722,6 +722,48 @@ END;
 $BODY$;
 
 --
+-- This is a simplified CTE version of "INSERT IF NOT ALREADY THERE",
+-- which perhaps could be rewritten using MERGE or INSERT .. ON
+-- CONFLICT.
+--
+
+CREATE PROCEDURE play_game(text)
+LANGUAGE SQL
+AS $$
+WITH new_game(txt) AS (
+  ---------------------
+  VALUES ($1)
+  ---------------------
+), already_into_games (id, game, txt) AS (
+  ----------------------------------------
+  SELECT g.id, g.game, n.txt
+  FROM games g, new_game n
+  WHERE %% g.game = n.txt
+  ----------------------------------------
+), inserted_into_games (id, game) AS (
+  ------------------------------------
+  INSERT INTO games(game)
+  SELECT %% n.txt
+  FROM new_game n
+  LEFT JOIN already_into_games a ON n.txt = a.txt
+  WHERE a.txt IS NULL
+  RETURNING id, game
+  ------------------------------------
+), full_new_game(id, game) AS (
+  -----------------------------
+  SELECT id, game
+  FROM inserted_into_games
+UNION ALL
+  SELECT id, game
+  FROM already_into_games
+  -----------------------------
+)
+INSERT INTO status
+SELECT id, game
+FROM full_new_game
+$$;
+
+--
 -- This function produces an SQL script that plays one turn and then
 -- produces another SQL script that does the same, starting a
 -- multi-transactional game.
