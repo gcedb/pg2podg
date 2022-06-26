@@ -8,17 +8,17 @@
    ],
    "license": "gpl_3",
    "provides": {
-      "pgchess": {
+      "pg2podg": {
          "abstract": "An extension for two-player open deterministic games",
          "file": "pg2podg.sql",
          "docfile": "doc/README.txt",
-         "version": "0.1.2"
+         "version": "0.1.4"
       }
    },
    "prereqs": {
       "runtime": {
          "requires": {
-            "PostgreSQL": "9.1.0"
+            "PostgreSQL": "11.0"
          }
       }
    },
