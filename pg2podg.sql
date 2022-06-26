@@ -646,20 +646,19 @@ END;
 $BODY$;
 
 --
--- This function performs a given number of full AI iterations in a
+-- This procedure performs a given number of full AI iterations in a
 -- single transaction. It can be used to run a single-transaction CPU
 -- v CPU game, as well as to run a regression test.
 --
 
-CREATE FUNCTION ui_loop
+CREATE PROCEDURE ui_loop
 ( iter int DEFAULT 1
 , time_target interval DEFAULT '1 second'
 , depth_target int DEFAULT 2
 , restart boolean DEFAULT false
 , regress boolean DEFAULT false
 , pause float DEFAULT 0
-) RETURNS void
-LANGUAGE plpgsql
+) LANGUAGE plpgsql
 AS $BODY$
 DECLARE
 	cone_vertex int;
@@ -722,46 +721,31 @@ END;
 $BODY$;
 
 --
--- This is a simplified CTE version of "INSERT IF NOT ALREADY THERE",
--- which perhaps could be rewritten using MERGE or INSERT .. ON
--- CONFLICT.
+-- This procedure loads a given game into the status, inserting it
+-- into the "games" table if it's not already found there.
 --
 
-CREATE PROCEDURE play_game(text)
+CREATE PROCEDURE load_game(text)
 LANGUAGE SQL
 AS $$
-WITH new_game(txt) AS (
-  ---------------------
-  VALUES ($1)
-  ---------------------
-), already_into_games (id, game, txt) AS (
-  ----------------------------------------
-  SELECT g.id, g.game, n.txt
-  FROM games g, new_game n
-  WHERE %% g.game = n.txt
-  ----------------------------------------
-), inserted_into_games (id, game) AS (
-  ------------------------------------
-  INSERT INTO games(game)
-  SELECT %% n.txt
-  FROM new_game n
-  LEFT JOIN already_into_games a ON n.txt = a.txt
-  WHERE a.txt IS NULL
+TRUNCATE status;
+WITH inserted_game AS (
+  INSERT INTO games(game) VALUES (%% $1)
+  ON CONFLICT DO NOTHING
   RETURNING id, game
-  ------------------------------------
-), full_new_game(id, game) AS (
-  -----------------------------
+), existing_game AS (
   SELECT id, game
-  FROM inserted_into_games
-UNION ALL
-  SELECT id, game
-  FROM already_into_games
-  -----------------------------
+  FROM games
+  WHERE %% game = $1
 )
 INSERT INTO status
-SELECT id, game
-FROM full_new_game
+  SELECT id, game
+  FROM inserted_game
+UNION ALL
+  SELECT id, game
+  FROM existing_game
 $$;
+
 
 --
 -- This function produces an SQL script that plays one turn and then
